@@ -84,7 +84,7 @@ bool RoboClaw::DriveForwardOrBackward(uint8_t address, uint8_t speed) {
 }
 
 bool RoboClaw::ReadFirmwareVersion(uint8_t address, std::string& firmwareVersion) {
-    uint8_t data;
+    int16_t data;
     uint8_t tries = CLAW_API_MAXRETRY;
     char response[50];
     size_t index = 0;
