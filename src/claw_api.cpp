@@ -11,21 +11,37 @@
 
 RoboClaw::RoboClaw() : crc(0) {}
 
+
 void RoboClaw::openPort(const std::string& device_name) {
+    // If already connected to the same device, close the existing connection first
+    if (isPortOpen() && port_ == device_name) {
+        std::cout << "Already connected to " << device_name << ". Disconnecting and reconnecting..." << std::endl;
+        closePort();  // Close the current connection
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Wait to ensure the port is released
+        std::cout << "Disconnected from " << device_name << "." << std::endl;
+    }
+
+    // Now open the port
     port_ = device_name;
     serialStream_.Open(port_);
     if (!serialStream_.IsOpen()) {
         throw std::runtime_error("Unable to open USB port");
     }
-    serialStream_.SetBaudRate(LibSerial::BaudRate::BAUD_38400);
+
+    serialStream_.SetBaudRate(LibSerial::BaudRate::BAUD_9600);
     serialStream_.SetCharacterSize(LibSerial::CharacterSize::CHAR_SIZE_8);
     serialStream_.SetParity(LibSerial::Parity::PARITY_NONE);
     serialStream_.SetStopBits(LibSerial::StopBits::STOP_BITS_1);
+
+    std::cout << "Connected to port: " << port_ << std::endl;
 }
 
 void RoboClaw::closePort() {
     if (serialStream_.IsOpen()) {
         serialStream_.Close();
+        std::cout << "Port " << port_ << " closed." << std::endl;
+    } else {
+        std::cout << "Port " << port_ << " is not open." << std::endl;
     }
 }
 
