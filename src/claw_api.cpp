@@ -13,22 +13,37 @@ RoboClaw::RoboClaw() : crc(0) {}
 
 
 void RoboClaw::openPort(const std::string& device_name) {
-    // If already connected to the same device, close the existing connection first
-    if (isPortOpen() && port_ == device_name) {
-        std::cout << "Already connected to " << device_name << ". Disconnecting and reconnecting..." << std::endl;
-        closePort();  // Close the current connection
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Wait to ensure the port is released
-        std::cout << "Disconnected from " << device_name << "." << std::endl;
-    }
-
+    // // If already connected to the same device, close the existing connection first
+    // if (isPortOpen() && port_ == device_name) {
+    //     std::cout << "Already connected to " << device_name << ". Disconnecting and reconnecting..." << std::endl;
+    //     closePort();  // Close the current connection
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(2000));  // Wait to ensure the port is released
+    //     std::cout << "Disconnected from " << device_name << "." << std::endl;
+    // }
+    closePort();  // Close the current connection
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Wait to ensure the port is released
+       
     // Now open the port
     port_ = device_name;
-    serialStream_.Open(port_);
+    
+    int retries = 5;
+    while (retries-- > 0) {
+        try {
+            serialStream_.Open(port_);
+            if (serialStream_.IsOpen()) {
+                std::cout << "Connected to RoboClaw." << std::endl;
+                break;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Failed to open port. Retrying..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
     if (!serialStream_.IsOpen()) {
-        throw std::runtime_error("Unable to open USB port");
+        throw std::runtime_error("Unable to open USB port after multiple attempts.");
     }
 
-    serialStream_.SetBaudRate(LibSerial::BaudRate::BAUD_9600);
+    serialStream_.SetBaudRate(LibSerial::BaudRate::BAUD_2400);
     serialStream_.SetCharacterSize(LibSerial::CharacterSize::CHAR_SIZE_8);
     serialStream_.SetParity(LibSerial::Parity::PARITY_NONE);
     serialStream_.SetStopBits(LibSerial::StopBits::STOP_BITS_1);
@@ -113,7 +128,7 @@ bool RoboClaw::ReadFirmwareVersion(uint8_t address, std::string& firmwareVersion
         crc_update(CLAW_API_READ_FIRMWARE_VERSION);
 
         while (index < sizeof(response) - 2) { // Leave space for line feed and null
-            data = read(1000); // Timeout in milliseconds
+            data = read(CLAW_API_TIMEOUT); // Timeout in milliseconds
             if (data == -1) {
                 std::cerr << "Read timeout" << std::endl;
                 break;
@@ -308,7 +323,7 @@ bool RoboClaw::write_n2(const std::vector<std::vector<uint8_t>>& dataGroups)
         write(crcValue);
 
         // Read the response and check if it's 0xFF (success)
-        if (read(10) == 0xFF) {
+        if (read(CLAW_API_TIMEOUT) == 0xFF) {
             return true;
         }
 
@@ -351,7 +366,8 @@ uint8_t RoboClaw::read(int timeout_ms) {
         // Check for timeout
         auto elapsed = std::chrono::steady_clock::now() - start_time;
         if (std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() >= timeout_ms) {
-            throw std::runtime_error("Read timeout");
+            // throw std::runtime_error("Read timeout");
+            return 0;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Small delay to prevent busy waiting

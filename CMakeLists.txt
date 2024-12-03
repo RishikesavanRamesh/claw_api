@@ -11,7 +11,7 @@ endif()
 
 
 find_package(ament_cmake REQUIRED)
-
+find_package(backward_ros REQUIRED)
 # let the compiler search for headers in the include folder
 include_directories(include)
  
@@ -63,7 +63,9 @@ target_link_libraries(${test_name} serial)
 endfunction()
 
 # add_gtest_with_includes(${PROJECT_NAME}_diff_drive_test test/diff_drive_test.cpp)
-add_gtest_with_includes(${PROJECT_NAME}_api_test test/api_test.cpp)
+# add_gtest_with_includes(${PROJECT_NAME}_api_test test/api_test.cpp)
+add_gtest_with_includes(${PROJECT_NAME}_rare_test test/rare_test.cpp)
+set_tests_properties(${PROJECT_NAME}_rare_test PROPERTIES TIMEOUT 9600)
 
 endif()
 
