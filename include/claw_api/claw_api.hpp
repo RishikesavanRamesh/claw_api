@@ -2,12 +2,13 @@
 #define CLAW_API_HPP
 
 #include <iostream>
-#include <libserial/SerialStream.h>
 #include <cstdint>
 #include <cstdarg>
 #include <stdexcept>
 #include <thread>
 #include <chrono>
+#include <rclcpp/logger.hpp>
+#include <string>
 
 #define CLAW_API_M1FORWARD 0
 #define CLAW_API_M1BACKWARD 1
@@ -26,60 +27,77 @@
 #define CLAW_API_READ_FIRMWARE_VERSION 21
 class RoboClaw {
 public:
-    RoboClaw();
-    void openPort(const std::string& device_name);
-    void closePort();
-    bool isPortOpen();
+     // A convenience struction to pass around configuration information.
+    typedef struct {
+        float p;
+        float i;
+        float d;
+        uint32_t qpps;
+        float max_current;
+    } TPIDQ;
+    RoboClaw(const TPIDQ m1Pid, const TPIDQ m2Pid, float m1MaxCurrent,
+            float m2MaxCurrent, std::string device_name, uint8_t device_port,
+            uint8_t vmin, uint8_t vtime);
 
-    ///// Packet Serial Commands
-    bool ForwardM1(uint8_t address, uint8_t speed);
-    bool BackwardM1(uint8_t address, uint8_t speed);
-
-    // bool SetMinimumMainVoltage(uint8_t address, uint8_t minimum_main_voltage);
-    // bool SetMaximumMainVoltage(uint8_t address, uint8_t maximum_main_voltage);
-
-    bool ForwardM2(uint8_t address, uint8_t speed);
-    bool BackwardM2(uint8_t address, uint8_t speed);
-    bool DriveM1(uint8_t address, uint8_t speed);
-    bool DriveM2(uint8_t address, uint8_t speed);
-
-    // --------------------------------------------mixed mode
-    bool DriveForward(uint8_t address, uint8_t speed);
-    bool DriveBackward(uint8_t address, uint8_t speed);
-    bool TurnRight(uint8_t address, uint8_t speed);    
-    bool TurnLeft(uint8_t address, uint8_t speed);
-    bool DriveForwardOrBackward(uint8_t address, uint8_t speed);
-    bool TurnLeftOrRight(uint8_t address, uint8_t speed);
-
-    ///// Advanced Packet Serial Commands
-    bool ReadFirmwareVersion(uint8_t address, std::string& firmwareVersion);
-
-    bool DriveM1WithSignedSpeed(uint8_t address, int32_t speed);
-    bool DriveM2WithSignedSpeed(uint8_t address, int32_t speed);
-
-    bool DriveM1M2WithSignedSpeed(uint8_t address, int32_t speedM1, int32_t speedM2);
-    
-    bool DriveM1M2WithSignedSpeedIndividualAcceleration(uint8_t address, int32_t acclM1, int32_t speedM1, int32_t acclM2, int32_t speedM2);
-    // bool SetSerialTimeout(uint8_t address, int32_t value);
-    bool SetSerialTimeout(uint8_t address, int32_t value);
-    
-    bool Stop();
     ~RoboClaw();
 
-private:
-    std::string port_;
-    LibSerial::SerialStream serialStream_;
-    uint16_t crc;
+    void openPort(const std::string& device_name);
+    void closePort();
 
-    std::vector<uint8_t> to_bytes(int64_t value, size_t bit_size);
-    
-    bool write_n(uint8_t cnt, ...);
-    bool write_n2(const std::vector<std::vector<uint8_t>>& dataGroups);
-    void crc_update(uint8_t data);
-    void crc_clear();
-    uint16_t crc_get();
-    size_t write(uint8_t byte);
-    uint8_t read(int timeout_ms);
+
+    void doM1M2AccelSpeed(uint32_t accel_m1_quad_pulses_per_second,
+                                        int32_t m1_quad_pulses_per_second,
+                                    uint32_t accel_m2_quad_pulses_per_second,
+                                        int32_t m2_quad_pulses_per_second) ;
+    // For a custom exception message.
+    struct TRoboClawException : public std::exception {
+        std::string s;
+        TRoboClawException(std::string ss) : s(ss) {}
+        ~TRoboClawException() throw() {}
+        const char *what() const throw() { return s.c_str(); }
+    };
+
+
+
+    // Get RoboClaw software versions.
+	std::string getVersion();
+
+      // Stop motion.
+     void stop();
+
+
+private:
+  int device_port_;  // Unix file descriptor for RoboClaw connection.
+  float m1p_;
+  float m1i_;
+  float m1d_;
+  int m1qpps_;
+  float m2p_;
+  float m2i_;
+  float m2d_;
+  int m2qpps_;
+  int maxCommandRetries_;    // Maximum number of times to retry a RoboClaw
+                             // command.
+  float maxM1Current_;       // Maximum allowed M1 current.
+  float maxM2Current_;       // Maximum allowed M2 current.
+  int motorAlarms_;          // Motors alarms. Bit-wise OR of contributors.
+  std::string device_name_;  // Device name of RoboClaw device.
+  int portAddress_;          // Port number of RoboClaw device under control
+  int vmin_;                 // Terminal control value.
+  int vtime_;                // Terminal control value.
+
+
+    void restartPort();
+    uint8_t readByteWithTimeout();
+      // Update the running CRC result.
+    void updateCrc(uint16_t &crc, uint8_t data);
+
+    // Write one byte to the device.
+    void writeByte(uint8_t byte);
+
+    // Write a stream of bytes to the device.
+    void writeN(bool sendCRC, uint8_t cnt, ...);
 };
+
 
 #endif // CLAW_API_HPP

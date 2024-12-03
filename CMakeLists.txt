@@ -11,6 +11,7 @@ endif()
 
 
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
 
 # let the compiler search for headers in the include folder
 include_directories(include)
@@ -18,6 +19,11 @@ include_directories(include)
 # define a library target called claw_api
 add_library(claw_api src/claw_api.cpp)
  
+
+ament_target_dependencies(
+  claw_api
+  rclcpp
+)
 
 target_include_directories(claw_api INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/claw_api>
@@ -59,12 +65,17 @@ function(add_gtest_with_includes test_name source_file)
     ${libserial_INCLUDE_DIRS}
   )
 
-target_link_libraries(${test_name} serial)
+# target_link_libraries(${test_name} serial)
 endfunction()
 
 # add_gtest_with_includes(${PROJECT_NAME}_diff_drive_test test/diff_drive_test.cpp)
-add_gtest_with_includes(${PROJECT_NAME}_api_test test/api_test.cpp)
+# add_gtest_with_includes(${PROJECT_NAME}_api_test test/api_test.cpp)
+add_gtest_with_includes(${PROJECT_NAME}_rare_test test/rare.cpp)
 
+ament_target_dependencies(
+  ${PROJECT_NAME}_rare_test
+  rclcpp
+)
 endif()
 
 ament_package()
